@@ -12,6 +12,7 @@ SIM_SOURCES:=$(PROJECT).cpp
 SOURCES:=$(PROJECT).sv
 LPF:=$(PROJECT).lpf
 TOP_MODULE:=$(PROJECT)
+VINC:=/usr/share/verilator/include
 
 .PHONY: all sim bit
 all: sim
@@ -22,7 +23,7 @@ bit: $(BUILD_DIR)/$(PROJECT).bit
 
 obj_dir/V$(PROJECT).cpp: \
 	$(addprefix $(SRC_DIR)/,$(SOURCES))
-	verilator -Wall -cc $<
+	verilator -Wall --trace -GWIDTH=12 -cc $<
 
 obj_dir/V$(PROJECT)__ALL.a: obj_dir/V$(PROJECT).cpp
 	make -C obj_dir -f V$(PROJECT).mk
@@ -31,8 +32,9 @@ $(BUILD_DIR)/$(PROJECT).ln: \
 	$(addprefix $(BENCH_DIR)/,$(SIM_SOURCES)) \
 	obj_dir/V$(PROJECT)__ALL.a
 	@echo "Building a Verilator-based simulation of $(PROJECT)"
-	g++ -I/usr/share/verilator/include -I obj_dir \
-	/usr/share/verilator/include/verilated.cpp \
+	g++ -I$(VINC) -I obj_dir \
+	$(VINC)/verilated.cpp \
+	$(VINC)/verilated_vcd_c.cpp \
 	$^ \
 	-o $@
 	ln -s $@ $(notdir $@)

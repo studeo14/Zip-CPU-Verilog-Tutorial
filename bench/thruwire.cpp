@@ -8,22 +8,56 @@
 #include <stdlib.h>
 #include "Vthruwire.h"
 #include "verilated.h"
+#include "verilated_vcd_c.h"
+
+typedef Vthruwire DUT;
+
+void tick(unsigned int tickcount, DUT *tb, VerilatedVcdC *tfp);
 
 int main(int argc, char **argv)
 {
+    int last_led;
+    unsigned int tickcount = 0;
+    Verilated::traceEverOn(true);
     Verilated::commandArgs(argc, argv);
 
-    Vthruwire *tb = new Vthruwire;
+    DUT *tb = new DUT;
+    VerilatedVcdC *tfp = new VerilatedVcdC;
+    tb->trace(tfp, 99);
+    tfp->open("trace.vcd");
 
-    tb->btn = 0;
-    for (int k = 0; k < 20; k++)
+    for (int k = 0; k < (1<<20); k++)
     {
-        tb->btn = k & 0x1ff;
-        tb->eval();
+        tick(++tickcount, tb, tfp);
 
-        printf("k = %2d, ", k);
-        printf("btn = %3x, ", tb->btn);
-        printf("led = %3x\n", tb->led);
+        if (last_led != tb->led)
+        {
+            printf("k = %7d, ", k);
+            printf("led = %d\n", tb->led);
+        }
+        last_led = tb->led;
     }
 
+}
+
+void tick(unsigned int tickcount, DUT *tb, VerilatedVcdC *tfp)
+{
+    tb->eval();
+    if (tfp)
+    {
+        tfp->dump(tickcount * 10 - 2);
+    }
+    tb->i_clk = 1;
+    tb->eval();
+    if (tfp)
+    {
+        tfp->dump(tickcount * 10);
+    }
+    tb->i_clk = 0;
+    tb->eval();
+    if (tfp)
+    {
+        tfp->dump(tickcount * 10 + 5);
+        tfp->flush();
+    }
 }

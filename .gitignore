@@ -9,3 +9,4 @@ gen/
 auto/*.ys
 obj_dir/
 *.ln
+*.vcd
