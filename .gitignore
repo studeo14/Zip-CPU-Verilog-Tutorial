@@ -1,0 +1,11 @@
+*_bmc/
+*_prove/
+*_cover/
+*_pll.v
+*.swp
+.*.d
+build/
+gen/
+auto/*.ys
+obj_dir/
+*.ln
