@@ -6,7 +6,8 @@
 .*.d
 build/
 gen/
-auto/*.ys
+auto/**
+!*.mk
 obj_dir/
 *.ln
-*.vcd
+*.vcd*

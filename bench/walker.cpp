@@ -26,14 +26,14 @@ int main(int argc, char **argv)
     tb->trace(tfp, 99);
     tfp->open("trace.vcd");
 
-    for (int k = 0; k < (1<<20); k++)
+    for (unsigned long k = 0; k < (1<<31); k++)
     {
         tick(++tickcount, tb, tfp);
 
         if (last_led != tb->led)
         {
-            printf("k = %7d, ", k);
-            printf("led = %d\n", tb->led);
+          printf("k = %30lu, ", k);
+          printf("led = %d\n", tb->led);
         }
         last_led = tb->led;
     }
