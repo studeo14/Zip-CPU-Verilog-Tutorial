@@ -23,15 +23,20 @@ prove: $(PROJECT).sby
 # sby stuff
 $(PROJECT).sby: \
 	$(addprefix $(SRC_DIR)/,$(SOURCES))
-	echo "[options]" > $@
-	echo "mode prove" >> $@
+	echo "[tasks]" > $@
+	echo "prf" >> $@
+	echo "cvr" >> $@
+	echo "[options]" >> $@
+	echo "depth 500" >> $@
+	echo "prf: mode prove" >> $@
+	echo "cvr: mode cover" >> $@
 	echo "[engines]" >> $@
 	echo "smtbmc" >> $@
 	echo "[script]" >> $@
 	echo "read -formal -sv $^" >> $@
 	echo "prep -top $(TOP_MODULE)" >> $@
 	echo "[files]" >> $@
-	echo "$(addsuffix \n,$^)" >> $@
+	$(foreach var,$^, echo "$(var)" >> $@;)
 
 # verilator build stuff
 

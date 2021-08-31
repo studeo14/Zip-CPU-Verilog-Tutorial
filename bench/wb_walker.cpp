@@ -98,7 +98,7 @@ int main(int argc, char **argv) {
       {
           if ((state != last_state) || (tb->o_led != last_led))
           {
-              printf("%7d: State #%2d ", tickcount, state);
+              printf("%7d: State 0x%02x ", tickcount, state);
               for(int j = 0; j < 8; j++)
               {
                   if (tb->o_led & (1<<j))

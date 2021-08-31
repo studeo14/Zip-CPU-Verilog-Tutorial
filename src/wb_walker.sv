@@ -36,6 +36,17 @@ module wb_walker(clk_25mhz,
     localparam IDLE = 0, COUNT = 1;
     reg                state, next_state;
     reg [3:0]          led_addr, next_led_addr;
+    wire               strobe;
+
+    // submodules
+    clock_div
+        #(
+          .CLOCK_RATE_HZ(10))
+    div0(
+         .i_clk(i_clk),
+         .enable(state),
+         .strobe(strobe)
+         );
 
     initial state = IDLE;
     initial led_addr = 0;
@@ -60,7 +71,7 @@ module wb_walker(clk_25mhz,
                     end
                 COUNT:
                     begin
-                        if (led_addr >= 4'hC)
+                        if (led_addr >= 4'hC && strobe)
                             next_state = IDLE;
                     end
                 default: next_state = IDLE;
@@ -72,7 +83,10 @@ module wb_walker(clk_25mhz,
         begin
             next_led_addr = 0;
             if (state == COUNT)
-                next_led_addr = led_addr + 1;
+                if (strobe || led_addr == 4'b0)
+                    next_led_addr = led_addr + 1;
+                else
+                    next_led_addr = led_addr;
         end
 
     // calc next led output value
@@ -117,8 +131,100 @@ module wb_walker(clk_25mhz,
 
     /* FORMAL VERIFCATION */
 `ifdef FORMAL
-    
+    // past validation
+    reg         f_past_valid;
+    initial f_past_valid = 0;
+    always @(posedge i_clk)
+        f_past_valid = 1'b1;
 
+    // assert o_led
+    always @(*)
+        if(state)
+            begin
+                assert(o_led != 7'b0);
+                case(led_addr)
+                    4'h0: assert(o_led == 7'b000_0001);
+                    4'h1: assert(o_led == 7'b000_0010);
+                    4'h2: assert(o_led == 7'b000_0100);
+                    4'h3: assert(o_led == 7'b000_1000);
+                    4'h4: assert(o_led == 7'b001_0000);
+                    4'h5: assert(o_led == 7'b010_0000);
+                    4'h6: assert(o_led == 7'b100_0000);
+                    4'h7: assert(o_led == 7'b010_0000);
+                    4'h8: assert(o_led == 7'b001_0000);
+                    4'h9: assert(o_led == 7'b000_1000);
+                    4'hA: assert(o_led == 7'b000_0100);
+                    4'hB: assert(o_led == 7'b000_0010);
+                    4'hC: assert(o_led == 7'b000_0001);
+                endcase // case (led_addr)
+            end
+        else
+            begin
+                assert(o_led == 7'b0);
+            end
+
+    always @(*)
+        assert(busy != (state == IDLE));
+
+    always @(*)
+        assert(led_addr <= 4'hC + 4'h1);
+
+    // after a request and not stalled, start processing request
+    always @(posedge i_clk)
+        begin
+            if ((f_past_valid) && ($past(i_stb)) && ($past(i_we)) && (!$past(o_stall)))
+                begin
+                    assert(state == COUNT);
+                    assert(busy);
+                end
+        end
+
+    // during the cycle the address should increment
+    always @(posedge i_clk)
+        begin
+            if ((f_past_valid) && ($past(busy)) && ($past(strobe) || $past(led_addr) == 4'h0) && ($past(state < 4'hC + 4'h1)))
+                begin
+                    assert(led_addr == $past(led_addr) + 1);
+                end
+        end
+
+    initial assume(!i_cyc);
+
+    // i_stb is only allowed if i_cyc
+    always @(*)
+        if (!i_cyc)
+            assume(!i_stb);
+
+    // when i_cyc goes high so too does i_stb
+    always @(posedge i_clk)
+        begin
+            if ((!$past(i_cyc)) && (i_cyc))
+                assume(i_stb);
+        end
+
+    always @(posedge i_clk)
+        begin
+            if ((f_past_valid) && ($past(i_stb)) && ($past(o_stall)))
+                begin
+                    // request is stalled
+                    // should not change
+                    assume(i_stb);
+                    assume(i_we == $past(i_we));
+                    assume(i_addr == $past(i_addr));
+                    if (i_we)
+                        assume(i_data == $past(i_data));
+                end
+        end
+
+    always @(posedge i_clk)
+        begin
+            if ((f_past_valid) && ($past(i_stb)) && (!$past(o_stall)))
+                assert(o_ack);
+        end
+
+    always @(posedge i_clk)
+        if (f_past_valid)
+            cover((!busy) && ($past(busy)));
 `endif
 
 endmodule // wb_walker
