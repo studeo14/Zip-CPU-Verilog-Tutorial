@@ -7,15 +7,15 @@ BUILD_DIR:=$(BASE_DIR)/build
 GEN_DIR:=$(BASE_DIR)/gen
 
 # project definitions
-PROJECT:=walker
+PROJECT:=helloworld
 SIM_SOURCES:=$(PROJECT).cpp
-SOURCES:=$(PROJECT).sv clock_div.sv
+SOURCES:=$(PROJECT).sv wb_uart_tx.sv hello_world_mem.sv clock_div.sv
 LPF:=$(PROJECT).lpf
 TOP_MODULE:=$(PROJECT)
 VINC:=/usr/share/verilator/include
 
 .PHONY: all sim bit prove
-all: sim bit prove
+all: sim
 sim: $(BUILD_DIR)/$(PROJECT).ln
 bit: $(BUILD_DIR)/$(PROJECT).bit
 prove: $(PROJECT).sby
@@ -23,22 +23,26 @@ prove: $(PROJECT).sby
 # sby stuff
 $(PROJECT).sby: \
 	$(addprefix $(SRC_DIR)/,$(SOURCES))
-	echo "[options]" > $@
-	echo "depth 100" >> $@
-	echo "mode prove" >> $@
+	echo "[tasks]" > $@
+	echo "prf" >> $@
+	echo "cvr" >> $@
+	echo "[options]" >> $@
+	echo "depth 500" >> $@
+	echo "prf: mode prove" >> $@
+	echo "cvr: mode cover" >> $@
 	echo "[engines]" >> $@
 	echo "smtbmc" >> $@
 	echo "[script]" >> $@
 	echo "read -formal -sv $^" >> $@
 	echo "prep -top $(TOP_MODULE)" >> $@
 	echo "[files]" >> $@
-	echo "$(addsuffix \n,$^)" >> $@
+	$(foreach var,$^, echo "$(var)" >> $@;)
 
 # verilator build stuff
 
 obj_dir/V$(PROJECT).cpp: \
 	$(addprefix $(SRC_DIR)/,$(SOURCES))
-	verilator -Wall --trace -cc $^
+	verilator -Wall --trace -cc $^ --top-module $(TOP_MODULE)
 
 obj_dir/V$(PROJECT)__ALL.a: obj_dir/V$(PROJECT).cpp
 	make -C obj_dir -f V$(PROJECT).mk

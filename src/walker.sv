@@ -24,6 +24,11 @@ module walker(clk_25mhz, led);
 
     // submodules
     clock_div
+`ifdef VERILATOR
+        #(25)
+`else
+        #(25_000_000)
+`endif
         clk_div_A (.i_clk(i_clk), .enable(1'b1), .strobe(strobe));
 
     // custom logic

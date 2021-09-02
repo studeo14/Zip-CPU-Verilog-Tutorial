@@ -24,7 +24,7 @@ module wb_uart_tx(i_clk, i_wr, i_data, o_uart_tx, o_busy);
         B5    = 4'h7,
         B6    = 4'h8,
         B7    = 4'h9,
-        STOP  = 4'hA;
+        LAST  = 4'hA;
 
     // internal signals
     reg [3:0]        state, next_state;
@@ -36,7 +36,7 @@ module wb_uart_tx(i_clk, i_wr, i_data, o_uart_tx, o_busy);
     reg              baud_strobe;
 
     initial state = IDLE;
-    initial local_data = 9{1'b1};
+    initial local_data = {9{1'b1}};
     initial o_busy = 0;
     initial counter = 0;
 
@@ -85,12 +85,13 @@ module wb_uart_tx(i_clk, i_wr, i_data, o_uart_tx, o_busy);
     // determine local_data
     always @(*)
         begin
+            next_local_data = local_data;
             if (trigger)
                 // load on trigger
                 next_local_data = {i_data, 1'b0};
-            else
+            else if (baud_strobe)
                 // shift out
-                next_local_data = {1'b1, i_data[8:1]};
+                next_local_data = {1'b1, local_data[8:1]};
         end
 
     // determine actual output
