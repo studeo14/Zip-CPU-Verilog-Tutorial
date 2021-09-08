@@ -9,7 +9,6 @@
 `ifdef VERILATOR
 module helloworld(i_clk, o_setup, o_uart_tx);
     input wire i_clk;
-    output wire [31:0] o_setup;
 `else
 module helloworld(clk_25mhz, o_uart_tx, o_led, wifi_gpio0);
     input wire clk_25mhz;
@@ -26,6 +25,7 @@ module helloworld(clk_25mhz, o_uart_tx, o_led, wifi_gpio0);
 
     parameter INITIAL_UART_SETUP = (CLOCK_RATE_HZ/BAUD_RATE);
 `ifdef VERILATOR
+    output wire [31:0] o_setup;
     assign o_setup = INITIAL_UART_SETUP;
 `endif
 
@@ -50,7 +50,7 @@ module helloworld(clk_25mhz, o_uart_tx, o_led, wifi_gpio0);
         if (tx_stb && !tx_busy)
             tx_index <= tx_index + 1'b1;
 
-    hello_world_rom
+    hello_world_mem
         data0 (
                .i_clk(i_clk),
                .i_index(tx_index),

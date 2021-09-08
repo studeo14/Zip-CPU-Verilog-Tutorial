@@ -8,17 +8,20 @@ GEN_DIR:=$(BASE_DIR)/gen
 
 # project definitions
 PROJECT:=helloworld
-SIM_SOURCES:=$(PROJECT).cpp
+SIM_SOURCES:=$(PROJECT).cpp uartsim.cpp
 SOURCES:=$(PROJECT).sv wb_uart_tx.sv hello_world_mem.sv clock_div.sv
 LPF:=$(PROJECT).lpf
 TOP_MODULE:=$(PROJECT)
 VINC:=/usr/share/verilator/include
 
 .PHONY: all sim bit prove
+.DELETE_ON_ERROR:
 all: sim
 sim: $(BUILD_DIR)/$(PROJECT).ln
 bit: $(BUILD_DIR)/$(PROJECT).bit
 prove: $(PROJECT).sby
+
+CPPOPTS:= #-g
 
 # sby stuff
 $(PROJECT).sby: \
@@ -42,7 +45,7 @@ $(PROJECT).sby: \
 
 obj_dir/V$(PROJECT).cpp: \
 	$(addprefix $(SRC_DIR)/,$(SOURCES))
-	verilator -Wall --trace -cc $^ --top-module $(TOP_MODULE)
+	verilator -Wall --trace -MMD  -cc $^ --top-module $(TOP_MODULE)
 
 obj_dir/V$(PROJECT)__ALL.a: obj_dir/V$(PROJECT).cpp
 	make -C obj_dir -f V$(PROJECT).mk
@@ -54,6 +57,7 @@ $(BUILD_DIR)/$(PROJECT).ln: \
 	g++ -I$(VINC) -I obj_dir \
 	$(VINC)/verilated.cpp \
 	$(VINC)/verilated_vcd_c.cpp \
+	$(CPPOPTS) \
 	$^ \
 	-o $@
 	ln -sf $@ $(notdir $@)
