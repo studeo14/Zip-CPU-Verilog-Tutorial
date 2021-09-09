@@ -20,8 +20,13 @@ module helloworld(clk_25mhz, o_uart_tx, o_led, wifi_gpio0);
 `endif
     output wire o_uart_tx;
 
+`ifdef FORMAL
+    parameter CLOCK_RATE_HZ = 15;
+    parameter BAUD_RATE = 5;
+`else
     parameter CLOCK_RATE_HZ = 25_000_000;
     parameter BAUD_RATE = 115_200;
+`endif
 
     parameter INITIAL_UART_SETUP = (CLOCK_RATE_HZ/BAUD_RATE);
 `ifdef VERILATOR
@@ -76,5 +81,53 @@ module helloworld(clk_25mhz, o_uart_tx, o_led, wifi_gpio0);
            .i_data(tx_data),
            .o_uart_tx(o_uart_tx),
            .o_busy(tx_busy));
+
+`ifdef FORMAL
+    // past validation
+    reg         f_past_valid;
+    initial f_past_valid = 0;
+    always @(posedge i_clk)
+        f_past_valid = 1'b1;
+
+    always @(*)
+        if (tx_index != 4'h0)
+            assert(tx_stb);
+    always @(*)
+        if (tx_stb && !tx_busy)
+            case(tx_index)
+                4'h0: assert(tx_data == "H");
+                4'h1: assert(tx_data == "e");
+                4'h2: assert(tx_data == "l");
+                4'h3: assert(tx_data == "l");
+                //
+                4'h4: assert(tx_data == "o");
+                4'h5: assert(tx_data == ",");
+                4'h6: assert(tx_data == " ");
+                4'h7: assert(tx_data == "W");
+                //
+                4'h8: assert(tx_data == "o");
+                4'h9: assert(tx_data == "r");
+                4'hA: assert(tx_data == "l");
+                4'hB: assert(tx_data == "d");
+                //
+                4'hC: assert(tx_data == "!");
+                4'hD: assert(tx_data == " ");
+                4'hE: assert(tx_data == "\n");
+                4'hF: assert(tx_data == "\r");
+                //
+            endcase // case (i_index)
+
+    always @(posedge i_clk)
+        begin
+            if (f_past_valid && $changed(tx_index))
+                begin
+                    assert($past(tx_stb) && !$past(tx_busy) && (tx_index == $past(tx_index)+1));
+                end
+            else if (f_past_valid)
+                begin
+                    assert($stable(tx_index) && (!$past(tx_stb) || $past(tx_busy)));
+                end
+        end
+`endif
 endmodule // helloworld
 

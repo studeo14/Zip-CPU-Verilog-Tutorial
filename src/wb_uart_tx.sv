@@ -31,19 +31,23 @@ module wb_uart_tx(i_clk, i_wr, i_data, o_uart_tx, o_busy);
     reg	             trigger;
     // - baud
     reg [23:0]       counter, next_counter;
-    reg              baud_strobe;
+    reg              baud_strobe, next_baud_strobe;
+    reg              next_o_busy;
 
     initial state = IDLE;
     initial local_data = {9{1'b1}};
     initial o_busy = 0;
     initial counter = 0;
+    initial baud_strobe = 1'b1;
 
     // state transitions
     always @(posedge i_clk)
         begin
-            state      <= next_state;
-            local_data <= next_local_data;
-            counter    <= next_counter;
+            state       <= next_state;
+            local_data  <= next_local_data;
+            counter     <= next_counter;
+            baud_strobe <= next_baud_strobe;
+            o_busy      <= next_o_busy;
         end
 
     // trigger condition
@@ -63,7 +67,7 @@ module wb_uart_tx(i_clk, i_wr, i_data, o_uart_tx, o_busy);
                 begin
                     case (state)
                         // stay in idle
-                        IDLE: next_state  = IDLE;
+                        IDLE: next_state    = IDLE;
                         // increment
                         START: next_state   = B0;
                         B0: next_state      = B1;
@@ -81,9 +85,27 @@ module wb_uart_tx(i_clk, i_wr, i_data, o_uart_tx, o_busy);
                 end
         end
 
-    // determine o_busy
+    // determine next o_busy
     always @(*)
-        o_busy = (state != IDLE);
+        begin
+            next_o_busy = o_busy;
+            if (trigger)
+                next_o_busy = 1'b1;
+            else if (baud_strobe)
+                begin
+                    case (state)
+                        // stay in idle
+                        IDLE: next_o_busy    = 1'b0;
+                        // increment
+                        START, B0, B1,
+                            B2, B3, B4,
+                            B5, B6, B7: next_o_busy = 1'b1;
+                        // end bit
+                        LAST: next_o_busy           = 1'b1;
+                        default: next_o_busy        = 1'b0;
+                    endcase // case (o_busy)
+                end
+        end
 
     // determine local_data
     always @(*)
@@ -104,23 +126,24 @@ module wb_uart_tx(i_clk, i_wr, i_data, o_uart_tx, o_busy);
     parameter [23:0] CLOCKS_PER_BAUD = 24'd868;
     always @(*)
         begin
-            next_counter = counter;
+            next_counter     = counter;
+            next_baud_strobe = baud_strobe;
             if (trigger)
                 begin
-                    next_counter = CLOCKS_PER_BAUD - 1;
+                    next_counter     = CLOCKS_PER_BAUD - 1;
+                    next_baud_strobe = 1'b0;
                 end
-            else if (counter > 0)
+            else if (!baud_strobe)
                 begin
-                    next_counter = counter - 1;
+                    next_counter     = counter - 1;
+                    next_baud_strobe = (counter == 24'b1);
                 end
-            else if (state != IDLE)
+            else if (state != IDLE) // && baud_strobe
                 begin
-                    next_counter = CLOCKS_PER_BAUD - 1;
+                    next_counter     = CLOCKS_PER_BAUD - 1;
+                    next_baud_strobe = 1'b0;
                 end
         end
-
-    always @(*)
-        baud_strobe = (counter == 0);
 
 `ifdef FORMAL
 
@@ -153,12 +176,13 @@ module wb_uart_tx(i_clk, i_wr, i_data, o_uart_tx, o_busy);
             B5:			assert(o_uart_tx == fv_data[5]);
             B6:			assert(o_uart_tx == fv_data[6]);
             B7:			assert(o_uart_tx == fv_data[7]);
+            LAST:		assert(o_uart_tx == 1'b1);
             default:assert(0);
         endcase // case (state)
 
     // internal checks
     always @(posedge i_clk)
-        assert(baud_strobe == (counter == 0));
+        assert(baud_strobe == (counter == 24'b0));
 
     always @(posedge i_clk)
         if (f_past_valid && ($past(counter) != 0))
@@ -186,6 +210,39 @@ module wb_uart_tx(i_clk, i_wr, i_data, o_uart_tx, o_busy);
     always @(posedge i_clk)
         if (!baud_strobe)
             assert(o_busy);
+
+    always @(*)
+        case(state)
+            IDLE: 	assert(local_data == {9{1'b1}});
+            START:	assert(local_data == {fv_data[7:0], 1'b0});
+            B0:			assert(local_data == {1'b1, fv_data[7:0]});
+            B1:			assert(local_data == {{2{1'b1}}, fv_data[7:1]});
+            B2:			assert(local_data == {{3{1'b1}}, fv_data[7:2]});
+            B3:			assert(local_data == {{4{1'b1}}, fv_data[7:3]});
+            B4:			assert(local_data == {{5{1'b1}}, fv_data[7:4]});
+            B5:			assert(local_data == {{6{1'b1}}, fv_data[7:5]});
+            B6:			assert(local_data == {{7{1'b1}}, fv_data[7:6]});
+            B7:			assert(local_data == {{8{1'b1}}, fv_data[7:7]});
+            LAST:		assert(local_data == {9{1'b1}});
+            default:assert(0);
+        endcase // case (state)
+
+    always @(*)
+        case (state)
+            IDLE: 	assert(local_data == {9{1'b1}});
+            START:	assert(local_data == {fv_data[7:0], 1'b0});
+            B0:			assert(local_data == {1'b1, fv_data[7:0]});
+            B1:			assert(local_data == {{2{1'b1}}, fv_data[7:1]});
+            B2:			assert(local_data == {{3{1'b1}}, fv_data[7:2]});
+            B3:			assert(local_data == {{4{1'b1}}, fv_data[7:3]});
+            B4:			assert(local_data == {{5{1'b1}}, fv_data[7:4]});
+            B5:			assert(local_data == {{6{1'b1}}, fv_data[7:5]});
+            B6:			assert(local_data == {{7{1'b1}}, fv_data[7:6]});
+            B7:			assert(local_data == {{8{1'b1}}, fv_data[7:7]});
+            LAST:		assert(local_data == {9{1'b1}});
+            default:assert(0);
+        endcase // case (state)
+
 `endif
 
 endmodule // wb_uart_tx

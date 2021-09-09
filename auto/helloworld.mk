@@ -30,7 +30,7 @@ $(PROJECT).sby: \
 	echo "prf" >> $@
 	echo "cvr" >> $@
 	echo "[options]" >> $@
-	echo "depth 500" >> $@
+	echo "depth 200" >> $@
 	echo "prf: mode prove" >> $@
 	echo "cvr: mode cover" >> $@
 	echo "[engines]" >> $@
