@@ -6,39 +6,37 @@
 
 `default_nettype none
 
-module wb_data_tx(i_clk, i_stb, i_data, o_busy, o_uart_tx);
-    parameter W;
-    parameter UART_SETUP;
+module wb_data_tx(i_clk, i_reset, i_stb, i_data, o_busy, o_uart_tx);
+    parameter W = 32;
+    parameter UART_SETUP = 858;
 
     // interface
-    input wire         i_clk, i_stb;
+    input wire         i_clk, i_stb, i_reset;
     input wire [W-1:0] i_data;
     output wire        o_busy, o_uart_tx;
 
-    reg [3:0]   tx_index;
-    wire [7:0]  tx_data;
-    wire        tx_busy;
-    reg         tx_stb;
+    reg [W-1:0]        sreg;
+    reg [7:0]          hex, tx_data;
+    reg [3:0]          tx_index;
+    reg [3:0]          state;
+    wire               tx_busy;
+    reg                tx_stb;
+
+
 
     initial tx_index = 0;
+    initial state = 0;
+
+
     always @(posedge i_clk)
         if (tx_stb && !tx_busy)
             tx_index <= tx_index + 1'b1;
-
-    hello_world_mem
-        data0 (
-               .i_clk(i_clk),
-               .i_index(tx_index),
-               .o_char(tx_data));
 
     initial tx_stb = 1'b0;
     always @(posedge i_clk)
         if (tx_send_strobe)
             begin
                 tx_stb <= 1'b1;
-`ifndef VERILATOR
-                o_led  <= !o_led;
-`endif
             end
         else if (tx_stb && !tx_busy && tx_index == 4'hF)
             tx_stb <= 1'b0;
@@ -100,4 +98,3 @@ module wb_data_tx(i_clk, i_stb, i_data, o_busy, o_uart_tx);
         end
 `endif
 endmodule // wb_data_tx
-

@@ -1,4 +1,4 @@
-/*
+i*
  * Graf Research Corporation
  * Copyright (c) 2021-2021
  * Graf Research Proprietary - Do Not Distribute
@@ -94,7 +94,6 @@ module data_mem(i_clk,
             default:o_data = W'b0;
         endcase // case (i_addr)
 
-
 `ifdef FORMAL
 
 `ifdef DM
@@ -167,12 +166,14 @@ module data_mem(i_clk,
             if ($changed(local_addr))
                 begin
                     assert($past(request_condition));
-                    assert($changed(o_data));
                 end
-            else // if $stable(local_addr)
+
+    always @(posedge i_clk)
+        if (f_past_valid)
+            if ($changed(o_data))
                 begin
-                    assert(!$past(request_condition));
-                    assert($stable(o_data));
+                    assert(($past(i_we) && $stable(local_addr)) || $changed(local_addr));
+                    assert($past(request_condition));
                 end
 
     // covers
