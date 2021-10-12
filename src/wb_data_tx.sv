@@ -22,68 +22,122 @@ module wb_data_tx(i_clk, i_reset, i_stb, i_data, o_busy, o_uart_tx);
     wire               tx_busy;
     reg                tx_stb;
 
-
-
     initial tx_index = 0;
     initial state = 0;
 
+    // trigger condition
+    reg                trigger_condition;
+    initial trigger_condition = 1'b0;
+    always @(*)
+        trigger_condition = i_stb && !o_busy;
 
-    always @(posedge i_clk)
-        if (tx_stb && !tx_busy)
-            tx_index <= tx_index + 1'b1;
-
+    // basic state machine for trigger condition, trigger single char tx, character counter
     initial tx_stb = 1'b0;
     always @(posedge i_clk)
-        if (tx_send_strobe)
+        if (i_reset)
             begin
-                tx_stb <= 1'b1;
+                state  <= 1;
+                tx_stb <= 0;
             end
-        else if (tx_stb && !tx_busy && tx_index == 4'hF)
-            tx_stb <= 1'b0;
+        else if (trigger_condition)
+            begin
+                state  <= 1;
+                tx_stb <= 1;
+            end
+        else if (tx_stb && !tx_busy) // increment state
+            begin
+                state     <= state + 1;
+                if (state >= 4'hd)
+                    begin
+                        tx_stb <= 0;
+                        state  <= 0;
+                    end
+            end
 
+    // shift register logic
+    initial sreg = 0;
+    always @(posedge i_clk)
+        if (trigger_condition)
+            sreg <= i_data;
+        else if (!tx_busy && state > 4'h1)
+            sreg <= {sreg[27:0], 4'h0};
+
+    // transform top 4 bits into proper character
+    always @(posedge i_clk)
+        case(sreg[31:28])
+            4'h0: hex <= "0";
+            4'h1: hex <= "1";
+            4'h2: hex <= "2";
+            4'h3: hex <= "3";
+            4'h4: hex <= "4";
+            4'h5: hex <= "5";
+            4'h6: hex <= "6";
+            4'h7: hex <= "7";
+            4'h8: hex <= "8";
+            4'h9: hex <= "9";
+            4'hA: hex <= "a";
+            4'hB: hex <= "b";
+            4'hC: hex <= "c";
+            4'hD: hex <= "d";
+            4'hE: hex <= "e";
+            4'hF: hex <= "f";
+            default:begin end
+        endcase // case (sreg[31:28])
+
+    // LUT for the actual character to send (based on state)
+    always @(posedge i_clk)
+        if (!tx_busy)
+            case(state)
+                4'h1: tx_data    <= "0";
+                4'h2: tx_data    <= "0";
+                4'h3: tx_data    <= hex;
+                4'h4: tx_data    <= hex;
+                4'h5: tx_data    <= hex;
+                4'h6: tx_data    <= hex;
+                4'h7: tx_data    <= hex;
+                4'h8: tx_data    <= hex;
+                4'h9: tx_data    <= hex;
+                4'hA: tx_data    <= hex;
+                4'hB: tx_data    <= "\r";
+                4'hC: tx_data    <= "\n";
+                default: tx_data <= "Q";
+            endcase // case (state)
+
+`ifdef FORMAL
+    (* anyseq *) wire serial_busy, serial_out;
+    assign o_uart_tx = serial_out;
+    assign tx_busy = serial_busy;
+`else
     wb_uart_tx #(
-                 .CLOCKS_PER_BAUD(INITIAL_UART_SETUP[23:0]))
+                 .CLOCKS_PER_BAUD(UART_SETUP[23:0]))
     uart0 (
            .i_clk(i_clk),
            .i_wr(tx_stb),
            .i_data(tx_data),
            .o_uart_tx(o_uart_tx),
            .o_busy(tx_busy));
+`endif
+
 
 `ifdef FORMAL
+    initial assume(i_reset);
+
     // past validation
     reg         f_past_valid;
     initial f_past_valid = 0;
     always @(posedge i_clk)
         f_past_valid = 1'b1;
 
-    always @(*)
-        if (tx_index != 4'h0)
-            assert(tx_stb);
-    always @(*)
-        if (tx_stb && !tx_busy)
-            case(tx_index)
-                4'h0: assert(tx_data == "H");
-                4'h1: assert(tx_data == "e");
-                4'h2: assert(tx_data == "l");
-                4'h3: assert(tx_data == "l");
-                //
-                4'h4: assert(tx_data == "o");
-                4'h5: assert(tx_data == ",");
-                4'h6: assert(tx_data == " ");
-                4'h7: assert(tx_data == "W");
-                //
-                4'h8: assert(tx_data == "o");
-                4'h9: assert(tx_data == "r");
-                4'hA: assert(tx_data == "l");
-                4'hB: assert(tx_data == "d");
-                //
-                4'hC: assert(tx_data == "!");
-                4'hD: assert(tx_data == " ");
-                4'hE: assert(tx_data == "\n");
-                4'hF: assert(tx_data == "\r");
-                //
-            endcase // case (i_index)
+    // assumptions about tx_busy
+    initial assume(!tx_busy);
+    always @(posedge i_clk)
+        if($past(i_reset))
+            assume(!tx_busy);
+        else if ($past(tx_stb) && !$past(tx_busy))
+            assume(tx_busy);
+        else if (!$past(tx_busy))
+            assume(!tx_busy);
+
 
     always @(posedge i_clk)
         begin
