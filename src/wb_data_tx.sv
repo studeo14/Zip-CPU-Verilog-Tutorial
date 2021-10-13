@@ -89,7 +89,7 @@ module wb_data_tx(i_clk, i_reset, i_stb, i_data, o_busy, o_uart_tx);
         if (!tx_busy)
             case(state)
                 4'h1: tx_data    <= "0";
-                4'h2: tx_data    <= "0";
+                4'h2: tx_data    <= "x";
                 4'h3: tx_data    <= hex;
                 4'h4: tx_data    <= hex;
                 4'h5: tx_data    <= hex;
@@ -128,6 +128,19 @@ module wb_data_tx(i_clk, i_reset, i_stb, i_data, o_busy, o_uart_tx);
     always @(posedge i_clk)
         f_past_valid = 1'b1;
 
+    reg [1:0]   f_minbusy;
+
+    initial f_minbusy = 0;
+    always @(posedge i_clk)
+        if (trigger_condition)
+            f_minbusy <= 2'b01;
+        else if (f_minbusy !=  2'b00)
+            f_minbusy <= f_minbusy + 1'b1;
+
+    always @(*)
+        if (f_minbusy != 0)
+            assume(tx_busy);
+
     // assumptions about tx_busy
     initial assume(!tx_busy);
     always @(posedge i_clk)
@@ -138,6 +151,9 @@ module wb_data_tx(i_clk, i_reset, i_stb, i_data, o_busy, o_uart_tx);
         else if (!$past(tx_busy))
             assume(!tx_busy);
 
+    always @(posedge i_clk)
+        if (f_past_valid)
+            cover($fell(o_busy));
 
     always @(posedge i_clk)
         begin
