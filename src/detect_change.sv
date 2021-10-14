@@ -4,14 +4,18 @@
  * Graf Research Proprietary - Do Not Distribute
  */
 
+`default_nettype none
+
 module detect_change(i_clk, i_data, i_busy, o_strobe, o_data);
     parameter W = 32;
     input wire          i_clk, i_busy;
     input wire [W-1:0]  i_data;
-    output wire         o_strobe;
-    output wire [W-1:0] o_data;
+    output reg          o_strobe;
+    output reg [W-1:0]  o_data;
 
-    initial {o_strobe, o_data} = 0;
+    initial o_strobe = 0;
+    initial o_data = 0;
+
     always @(posedge i_clk)
         if (!i_busy)
             begin
