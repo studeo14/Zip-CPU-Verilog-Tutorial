@@ -17,13 +17,12 @@ module wb_data_tx(i_clk, i_reset, i_stb, i_data, o_busy, o_uart_tx);
 
     reg [W-1:0]        sreg;
     reg [7:0]          hex, tx_data;
-    reg [3:0]          tx_index;
     reg [3:0]          state;
     wire               tx_busy;
     reg                tx_stb;
 
-    initial tx_index = 0;
     initial state = 0;
+    assign o_busy = state > 4'h0;
 
     // trigger condition
     reg                trigger_condition;
@@ -132,7 +131,7 @@ module wb_data_tx(i_clk, i_reset, i_stb, i_data, o_busy, o_uart_tx);
 
     initial f_minbusy = 0;
     always @(posedge i_clk)
-        if (trigger_condition)
+        if (tx_stb && !tx_busy)
             f_minbusy <= 2'b01;
         else if (f_minbusy !=  2'b00)
             f_minbusy <= f_minbusy + 1'b1;
@@ -140,6 +139,9 @@ module wb_data_tx(i_clk, i_reset, i_stb, i_data, o_busy, o_uart_tx);
     always @(*)
         if (f_minbusy != 0)
             assume(tx_busy);
+
+    always @(*)
+        assert(trigger_condition == (i_stb && !o_busy));
 
     // assumptions about tx_busy
     initial assume(!tx_busy);
@@ -152,19 +154,7 @@ module wb_data_tx(i_clk, i_reset, i_stb, i_data, o_busy, o_uart_tx);
             assume(!tx_busy);
 
     always @(posedge i_clk)
-        if (f_past_valid)
+        if (f_past_valid && !$past(i_reset))
             cover($fell(o_busy));
-
-    always @(posedge i_clk)
-        begin
-            if (f_past_valid && $changed(tx_index))
-                begin
-                    assert($past(tx_stb) && !$past(tx_busy) && (tx_index == $past(tx_index)+1));
-                end
-            else if (f_past_valid)
-                begin
-                    assert($stable(tx_index) && (!$past(tx_stb) || $past(tx_busy)));
-                end
-        end
 `endif
 endmodule // wb_data_tx
