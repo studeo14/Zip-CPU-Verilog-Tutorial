@@ -22,11 +22,11 @@ VINC:= $(VERILATOR_ROOT)/include
 LIBS := -lncurses
 
 
-.PHONY: all sim prove
+.PHONY: all sim prove bit
 .DELETE_ON_ERROR:
 all: sim
 sim: $(BUILD_DIR)/$(PROJECT).ln
-# bit: $(BUILD_DIR)/$(PROJECT).bit
+bit: $(BUILD_DIR)/$(PROJECT).bit
 prove: $(PROJECT).sby
 
 GCC := clang++
