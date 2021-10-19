@@ -7,10 +7,12 @@
 #include <time.h>
 #include <sys/types.h>
 #include <signal.h>
+#include <memory>
 #include "verilated.h"
 #include "Vdata_debugger.h"
 #include "testbench.h"
 #include "uartsim.h"
+#include "btnsim.h"
 
 typedef Vdata_debugger DUT;
 
@@ -28,8 +30,9 @@ typedef Vdata_debugger DUT;
 int main(int argc, char **argv)
 {
     Verilated::commandArgs(argc, argv);
-    Testbench<DUT> *tb = new Testbench<DUT>;
-    Uart *uart = new Uart();
+    auto tb = std::make_unique<Testbench<DUT>>();
+    auto uart = std::make_unique<Uart>();
+    auto btn = std::make_unique<Btn>();
     unsigned baudclocks;
     baudclocks = tb->m_core->o_setup;
     uart->setup(baudclocks);
@@ -58,17 +61,21 @@ int main(int argc, char **argv)
         {
             done = true;
         }
-        else if (ERR != chv)
+        else if ('r' == chv)
         {
-            tb->m_core->i_event = 1;
+            btn->release();
+        }
+        else if (ERR != chv && !btn->pressed())
+        {
+            keypresses++;
+            btn->press();
         }
 
         for (int k = 0; k < 1000; k++)
         {
             tb->tick();
             (*uart)(tb->m_core->o_uart_tx);
-            keypresses += tb->m_core->i_event;
-            tb->m_core->i_event = 0;
+            tb->m_core->i_event = (*btn)();
         }
     } while(!done);
 

@@ -9,8 +9,8 @@ GEN_DIR:=$(BASE_DIR)/gen
 # project definitions
 PROJECT:=data_debugger
 SIM_SOURCES:=$(PROJECT).cpp
-COSIMS:=uartsim.cpp
-SOURCES:=$(PROJECT).sv detect_change.sv counter.sv wb_data_tx.sv wb_uart_tx.sv
+COSIMS:=uartsim.cpp btnsim.cpp
+SOURCES:=$(PROJECT).sv detect_change.sv counter.sv wb_data_tx.sv wb_uart_tx.sv debouncer.sv
 LPF:=$(PROJECT).lpf
 TOP_MODULE:=$(PROJECT)
 

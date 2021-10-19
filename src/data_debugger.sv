@@ -15,21 +15,26 @@ module data_debugger(i_clk, i_event,
 
     parameter UART_SETUP = (CLOCK_RATE_HZ / BAUD_RATE);
 
-    wire               w_event;
 `ifdef VERILATOR
     output wire [31:0] o_setup;
     assign o_setup = UART_SETUP;
-    assign w_event = i_event;
-`else
-    reg                last_btn;
-    initial last_btn = 0;
-    always @(posedge i_clk)
-        last_btn   <= i_event;
-    assign w_event  = i_event && !last_btn;
 `endif
 
     wire [31:0]        counterv, tx_data;
     wire               tx_busy, tx_stb;
+    wire               btn_deb;
+    wire               w_event;
+    reg                last_btn;
+
+    initial last_btn = 0;
+    always @(posedge i_clk)
+        last_btn   <= btn_deb;
+    assign w_event  = btn_deb && !last_btn;
+
+    debouncer event_deb(
+                        .i_clk(i_clk),
+                        .i_event(i_event),
+                        .o_event(btn_deb));
 
     counter thecounter(
                        .i_clk(i_clk),
