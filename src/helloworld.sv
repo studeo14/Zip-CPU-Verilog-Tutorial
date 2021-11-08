@@ -55,7 +55,7 @@ module helloworld(clk_25mhz, o_uart_tx, o_led, wifi_gpio0);
         if (tx_stb && !tx_busy)
             tx_index <= tx_index + 1'b1;
 
-    hello_world_mem
+    hello_psalm_mem
         data0 (
                .i_clk(i_clk),
                .i_index(tx_index),
