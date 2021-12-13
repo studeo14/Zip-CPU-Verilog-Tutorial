@@ -3,9 +3,9 @@
  */
 
 module hello_psalm_mem(i_clk, i_addr, i_data, i_we, o_data);
-    parameter W = 8;
+    parameter W = 11;
     parameter DW = 8;
-    parameter FILE_NAME = "psalm_mem.hex";
+    parameter FILE_NAME = "../res/psalm.hex";
 
     // interface
     input i_clk, i_we;

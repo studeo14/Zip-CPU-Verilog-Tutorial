@@ -7,10 +7,10 @@
 `default_nettype none
 
 `ifdef VERILATOR
-module helloworld(i_clk, o_setup, o_uart_tx);
+module hellopsalm(i_clk, o_setup, o_uart_tx);
     input wire i_clk;
 `else
-module helloworld(clk_25mhz, o_uart_tx, o_led, wifi_gpio0);
+module hellopsalm(clk_25mhz, o_uart_tx, o_led, wifi_gpio0);
     input wire clk_25mhz;
     output wire wifi_gpio0;
     output reg  o_led;
@@ -45,21 +45,27 @@ module helloworld(clk_25mhz, o_uart_tx, o_led, wifi_gpio0);
                    .enable(1'b1),
                    .strobe(tx_send_strobe));
 
-    reg [3:0]   tx_index;
+    reg [10:0]   tx_index;
     wire [7:0]  tx_data;
     wire        tx_busy;
     reg         tx_stb;
+
+    localparam DATA_LEN = 1600;
 
     initial tx_index = 0;
     always @(posedge i_clk)
         if (tx_stb && !tx_busy)
             tx_index <= tx_index + 1'b1;
 
-    hello_world_mem
+    hello_psalm_mem
         data0 (
-               .i_clk(i_clk),
-               .i_index(tx_index),
-               .o_char(tx_data));
+               // Outputs
+               .o_data                  (tx_data),
+               // Inputs
+               .i_clk                   (i_clk),
+               .i_we                    (0),
+               .i_addr                  (tx_index),
+               .i_data                  (0));
 
     initial tx_stb = 1'b0;
     always @(posedge i_clk)
@@ -70,7 +76,7 @@ module helloworld(clk_25mhz, o_uart_tx, o_led, wifi_gpio0);
                 o_led  <= !o_led;
 `endif
             end
-        else if (tx_stb && !tx_busy && tx_index == 4'hF)
+        else if (tx_stb && !tx_busy && tx_index == DATA_LEN)
             tx_stb <= 1'b0;
 
     wb_uart_tx #(
@@ -129,5 +135,4 @@ module helloworld(clk_25mhz, o_uart_tx, o_led, wifi_gpio0);
                 end
         end
 `endif
-endmodule // helloworld
-
+endmodule // hellopsalm

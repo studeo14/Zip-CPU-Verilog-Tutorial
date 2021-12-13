@@ -5,6 +5,8 @@ BENCH_DIR:=$(BASE_DIR)/bench
 IMPL_DIR:=$(BASE_DIR)/impl
 BUILD_DIR:=$(BASE_DIR)/build
 GEN_DIR:=$(BASE_DIR)/gen
+RES_DIR:=$(BASE_DIR)/res
+TOOLS_DIR:=$(BASE_DIR)/tools
 
 # project definitions
 PROJECT:=hellopsalm
@@ -32,6 +34,14 @@ prove: $(PROJECT).sby
 GCC := clang++
 VDIRFB:=obj_dir
 CFLAGS:= -g -Wall -I$(VINC) -I $(VDIRFB)
+
+$(SRC_DIR)/hello_psalm_mem.sv: $(RES_DIR)/psalm.hex
+
+$(RES_DIR)/psalm.hex: $(RES_DIR)/psalm.txt $(TOOLS_DIR)/hexgen/target/debug/hexgen
+	cd $(TOOLS_DIR)/hexgen; cargo run $(RES_DIR)/psalm.txt
+
+$(TOOLS_DIR)/genhex/target/debug/hexgen: $(TOOLS_DIR)/genhex/target/src/main.rs
+	cd $(TOOLS_DIR)/hexgen; cargo build
 
 # sby stuff
 $(PROJECT).sby: \
@@ -86,6 +96,7 @@ IDCODE ?= 0x41113043 #85
 
 %.v: Makefile
 
+%.sv: Makefile
 
 $(PROJECT).ys: \
 	$(addprefix $(SRC_DIR)/,$(SOURCES))
@@ -104,6 +115,8 @@ $(BUILD_DIR)/%.config: $(BUILD_DIR)/%.json $(IMPL_DIR)/$(LPF)
 		--json $< \
 		--textcfg $@ \
 		--lpf $(IMPL_DIR)/$(LPF) \
+		--placer heap \
+		--router router2 \
 		--85k \
 		--package CABGA381
 
@@ -115,6 +128,7 @@ $(BUILD_DIR)/%.bit: $(BUILD_DIR)/%.config
 
 %.flash: %.bit
 	ujprog $<
+
 %.terminal: %.bit
 	ujprog -t -b 3000000 $<
 
