@@ -50,12 +50,18 @@ module hellopsalm(clk_25mhz, o_uart_tx, o_led, wifi_gpio0);
     wire        tx_busy;
     reg         tx_stb;
 
-    localparam DATA_LEN = 1600;
+    localparam DATA_LEN = 11'd1554;
 
     initial tx_index = 0;
     always @(posedge i_clk)
         if (tx_stb && !tx_busy)
-            tx_index <= tx_index + 1'b1;
+            begin
+                if (tx_index == DATA_LEN)
+                    tx_index <= 0;
+                else
+                    tx_index <= tx_index + 1'b1;
+            end
+
 
     hello_psalm_mem
         data0 (
