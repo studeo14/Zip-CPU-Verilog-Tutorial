@@ -40,10 +40,11 @@ module clock_div(i_clk, enable, strobe);
         end
 
 `ifdef FORMAL
+    always @(*)
+        assert(strobe == (counter == 0));
     always @(posedge i_clk)
         begin
-            assert(counter <= LIMIT - 1);
-            assert(strobe == (counter == 0));
+            assert((LIMIT - 1) >= counter);
         end
 `endif
 

@@ -7,10 +7,10 @@
 `default_nettype none
 
 `ifdef VERILATOR
-module hellopsalm(i_clk, o_setup, o_uart_tx);
+module hellopsalm(i_clk, i_reset, o_setup, o_uart_tx);
     input wire i_clk;
 `else
-module hellopsalm(clk_25mhz, o_uart_tx, o_led, wifi_gpio0);
+module hellopsalm(clk_25mhz, i_reset, o_uart_tx, o_led, wifi_gpio0);
     input wire clk_25mhz;
     output wire wifi_gpio0;
     output reg  o_led;
@@ -18,6 +18,7 @@ module hellopsalm(clk_25mhz, o_uart_tx, o_led, wifi_gpio0);
     assign i_clk = clk_25mhz;
     assign wifi_gpio0 = 1;
 `endif
+    input wire i_reset;
     output wire o_uart_tx;
 
 `ifdef FORMAL
@@ -54,14 +55,16 @@ module hellopsalm(clk_25mhz, o_uart_tx, o_led, wifi_gpio0);
 
     initial tx_index = 0;
     always @(posedge i_clk)
-        if (tx_stb && !tx_busy)
-            begin
-                if (tx_index == DATA_LEN)
-                    tx_index <= 0;
-                else
-                    tx_index <= tx_index + 1'b1;
-            end
-
+        if (i_reset)
+            tx_index <= 0;
+        else
+            if (tx_stb && !tx_busy)
+                begin
+                    if (tx_index == DATA_LEN)
+                        tx_index <= 0;
+                    else
+                        tx_index <= tx_index + 1'b1;
+                end
 
     hello_psalm_mem
         data0 (
@@ -75,16 +78,26 @@ module hellopsalm(clk_25mhz, o_uart_tx, o_led, wifi_gpio0);
 
     initial tx_stb = 1'b0;
     always @(posedge i_clk)
-        if (tx_send_strobe)
+        if (i_reset)
             begin
-                tx_stb <= 1'b1;
+                tx_stb <= 0;
 `ifndef VERILATOR
-                o_led  <= !o_led;
+                o_led  <= 0;
 `endif
             end
-        else if (tx_stb && !tx_busy && tx_index == DATA_LEN)
-            tx_stb <= 1'b0;
-
+        else
+            begin
+                if (tx_send_strobe)
+                    begin
+                        tx_stb <= 1'b1;
+`ifndef VERILATOR
+                        o_led  <= !o_led;
+`endif
+                    end
+                else if (tx_stb && !tx_busy && tx_index >= (DATA_LEN - 1))
+                    tx_stb <= 1'b0;
+            end
+`ifndef FORMAL
     wb_uart_tx #(
                  .CLOCKS_PER_BAUD(INITIAL_UART_SETUP[23:0]))
     uart0 (
@@ -93,6 +106,11 @@ module hellopsalm(clk_25mhz, o_uart_tx, o_led, wifi_gpio0);
            .i_data(tx_data),
            .o_uart_tx(o_uart_tx),
            .o_busy(tx_busy));
+`else
+    (* anyseq *) wire f_ser_busy, f_ser_out;
+    assign o_uart_tx = f_ser_out;
+    assign tx_busy = f_ser_busy;
+`endif
 
 `ifdef FORMAL
     // past validation
@@ -101,44 +119,62 @@ module hellopsalm(clk_25mhz, o_uart_tx, o_led, wifi_gpio0);
     always @(posedge i_clk)
         f_past_valid = 1'b1;
 
-    always @(*)
-        if (tx_index != 4'h0)
-            assert(tx_stb);
-    always @(*)
-        if (tx_stb && !tx_busy)
-            case(tx_index)
-                4'h0: assert(tx_data == "H");
-                4'h1: assert(tx_data == "e");
-                4'h2: assert(tx_data == "l");
-                4'h3: assert(tx_data == "l");
-                //
-                4'h4: assert(tx_data == "o");
-                4'h5: assert(tx_data == ",");
-                4'h6: assert(tx_data == " ");
-                4'h7: assert(tx_data == "W");
-                //
-                4'h8: assert(tx_data == "o");
-                4'h9: assert(tx_data == "r");
-                4'hA: assert(tx_data == "l");
-                4'hB: assert(tx_data == "d");
-                //
-                4'hC: assert(tx_data == "!");
-                4'hD: assert(tx_data == " ");
-                4'hE: assert(tx_data == "\n");
-                4'hF: assert(tx_data == "\r");
-                //
-            endcase // case (i_index)
+    initial
+        begin
+        end
+
+    // assert initial values
+    parameter W = 11;
+    parameter DW = 8;
+    parameter FILE_NAME = "../res/psalm.hex";
+    reg [DW-1:0]        f_ram [0:(1<<W)-1];
+    initial $readmemh(FILE_NAME, f_ram);
+
+    (* anyconst *) reg [W-1:0] f_const_addr;
+    reg [DW-1:0]        f_const_value;
+    always @(posedge i_clk)
+        if (!f_past_valid)
+            f_const_value <= f_ram[f_const_addr];
+        else
+            assert(f_const_value == f_ram[f_const_addr]);
+    always @(posedge i_clk)
+        if (f_past_valid)
+            if ($past(tx_stb) && !$past(tx_busy) && ($past(tx_index) == f_const_addr))
+                assert(tx_data == f_const_value);
 
     always @(posedge i_clk)
         begin
-            if (f_past_valid && $changed(tx_index))
-                begin
-                    assert($past(tx_stb) && !$past(tx_busy) && (tx_index == $past(tx_index)+1));
-                end
-            else if (f_past_valid)
-                begin
-                    assert($stable(tx_index) && (!$past(tx_stb) || $past(tx_busy)));
-                end
+            if (f_past_valid && !$past(i_reset))
+                if (f_past_valid && $changed(tx_index))
+                    begin
+                        assert($past(tx_stb) && !$past(tx_busy) && (tx_index == $past(tx_index)+1));
+                    end
+                else if (f_past_valid)
+                    begin
+                        assert($stable(tx_index) && (!$past(tx_stb) || $past(tx_busy) || $past(tx_send_strobe, 2)));
+                    end
         end
+
+    always @(posedge i_clk)
+        if (f_past_valid)
+            begin
+                assert(DATA_LEN >= tx_index);
+                if ((DATA_LEN > tx_index) && (tx_index > 0))
+                    assert(tx_stb);
+                cover(tx_index == 30);
+
+            end
+    always @(*)
+        if (!f_past_valid)
+            assume(i_reset);
+
+    always @(posedge i_clk)
+        if ((!f_past_valid)||$past(i_reset))
+            begin
+                assert(tx_index == 0);
+                assert(tx_stb == 0);
+            end
+
+
 `endif
 endmodule // hellopsalm

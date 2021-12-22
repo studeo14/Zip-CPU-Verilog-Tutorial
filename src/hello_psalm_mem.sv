@@ -25,4 +25,20 @@ module hello_psalm_mem(i_clk, i_addr, i_data, i_we, o_data);
     always @(posedge i_clk)
         o_data <= ram[i_addr];
 
+`ifdef FORMAL
+    reg         f_past_valid;
+    initial f_past_valid = 0;
+    always @(posedge i_clk)
+        f_past_valid = 1'b1;
+
+    (* anyconst *) reg [W-1:0] f_const_addr;
+    reg [DW-1:0]        f_const_value;
+    always @(posedge i_clk)
+        if (!f_past_valid)
+            f_const_value <= ram[f_const_addr];
+        else
+            assert(f_const_value == ram[f_const_addr]);
+
+`endif
+
 endmodule // hello_psalm_mem
