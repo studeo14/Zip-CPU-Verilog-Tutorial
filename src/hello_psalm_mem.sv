@@ -16,20 +16,26 @@ module hello_psalm_mem(i_clk, i_addr, i_data, i_we, o_data);
 
     reg [DW-1:0]        ram [0:(1<<W)-1];
 
+    initial o_data = 0;
+
     initial $readmemh(FILE_NAME, ram);
 
     always @(posedge i_clk)
-        if (i_we)
-            ram[i_addr] <= i_data;
-
-    always @(posedge i_clk)
-        o_data <= ram[i_addr];
+        begin
+            if (i_we)
+                ram[i_addr] <= i_data;
+            o_data <= ram[i_addr];
+        end
 
 `ifdef FORMAL
     reg         f_past_valid;
     initial f_past_valid = 0;
     always @(posedge i_clk)
         f_past_valid = 1'b1;
+
+    always @(posedge i_clk)
+        if (!f_past_valid)
+            assert(o_data == 0);
 
     (* anyconst *) reg [W-1:0] f_const_addr;
     reg [DW-1:0]        f_const_value;

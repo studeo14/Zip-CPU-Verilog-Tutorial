@@ -20,9 +20,10 @@ module hellopsalm(clk_25mhz, i_reset, o_uart_tx, o_led, wifi_gpio0);
 `endif
     input wire i_reset;
     output wire o_uart_tx;
+    localparam DATA_LEN = 11'd1554;
 
 `ifdef FORMAL
-    parameter CLOCK_RATE_HZ = 15;
+    parameter CLOCK_RATE_HZ = DATA_LEN;
     parameter BAUD_RATE = 5;
 `else
     parameter CLOCK_RATE_HZ = 25_000_000;
@@ -50,8 +51,6 @@ module hellopsalm(clk_25mhz, i_reset, o_uart_tx, o_led, wifi_gpio0);
     wire [7:0]  tx_data;
     wire        tx_busy;
     reg         tx_stb;
-
-    localparam DATA_LEN = 11'd1554;
 
     initial tx_index = 0;
     always @(posedge i_clk)
@@ -119,9 +118,52 @@ module hellopsalm(clk_25mhz, i_reset, o_uart_tx, o_led, wifi_gpio0);
     always @(posedge i_clk)
         f_past_valid = 1'b1;
 
-    initial
-        begin
-        end
+    always @(posedge i_clk)
+        if (!f_past_valid || $past(i_reset))
+            begin
+                assert(tx_index == 0);
+                assert(tx_stb == 0);
+            end
+        else if ($changed(tx_index))
+            begin
+                assert($past(tx_stb) && !$past(tx_busy));
+                if (tx_index == 0)
+                    assert($past(tx_index) == DATA_LEN);
+                else
+                    assert(tx_index == $past(tx_index) + 1);
+            end
+        else
+            begin
+                assert($stable(tx_index) && (!$past(tx_stb) || $past(tx_busy)));
+            end
+
+    always @(posedge i_clk)
+        if (tx_index != 0)
+            assert(tx_stb);
+
+    always @(posedge i_clk)
+        assert(tx_index < DATA_LEN);
+
+    initial assume(!tx_busy);
+    always @(posedge i_clk)
+        if ($past(i_reset))
+            assume(!tx_busy);
+        else if ($past(tx_stb) && !$past(tx_busy))
+            assume(tx_busy);
+        else if (!$past(tx_busy))
+            assume(tx_busy);
+
+    reg [1:0] f_minbusy;
+    initial f_minbusy = 0;
+    always @(posedge i_clk)
+        if (tx_stb && !tx_busy)
+            f_minbusy <= 2'b01;
+        else if (f_minbusy != 2'b00)
+            f_minbusy <= f_minbusy + 1'b1;
+
+    always @(*)
+        if (f_minbusy != 0)
+            assume(tx_busy);
 
     // assert initial values
     parameter W = 11;
@@ -137,33 +179,12 @@ module hellopsalm(clk_25mhz, i_reset, o_uart_tx, o_led, wifi_gpio0);
             f_const_value <= f_ram[f_const_addr];
         else
             assert(f_const_value == f_ram[f_const_addr]);
+
     always @(posedge i_clk)
         if (f_past_valid)
-            if ($past(tx_stb) && !$past(tx_busy) && ($past(tx_index) == f_const_addr))
+            if ($past(tx_stb) && $past(tx_busy) && ($past(tx_index) == f_const_addr))
                 assert(tx_data == f_const_value);
 
-    always @(posedge i_clk)
-        begin
-            if (f_past_valid && !$past(i_reset))
-                if (f_past_valid && $changed(tx_index))
-                    begin
-                        assert($past(tx_stb) && !$past(tx_busy) && (tx_index == $past(tx_index)+1));
-                    end
-                else if (f_past_valid)
-                    begin
-                        assert($stable(tx_index) && (!$past(tx_stb) || $past(tx_busy) || $past(tx_send_strobe, 2)));
-                    end
-        end
-
-    always @(posedge i_clk)
-        if (f_past_valid)
-            begin
-                assert(DATA_LEN >= tx_index);
-                if ((DATA_LEN > tx_index) && (tx_index > 0))
-                    assert(tx_stb);
-                cover(tx_index == 30);
-
-            end
     always @(*)
         if (!f_past_valid)
             assume(i_reset);
