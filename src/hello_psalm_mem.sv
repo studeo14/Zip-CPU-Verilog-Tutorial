@@ -16,14 +16,15 @@ module hello_psalm_mem(i_clk, i_addr, i_data, i_we, o_data);
 
     reg [DW-1:0]        ram [0:(1<<W)-1];
 
-    initial o_data = 0;
-
     initial $readmemh(FILE_NAME, ram);
 
     always @(posedge i_clk)
         begin
             if (i_we)
                 ram[i_addr] <= i_data;
+        end
+    always @(posedge i_clk)
+        begin
             o_data <= ram[i_addr];
         end
 
