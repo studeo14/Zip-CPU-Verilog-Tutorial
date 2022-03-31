@@ -37,11 +37,8 @@ CFLAGS:= -g -Wall -I$(VINC) -I $(VDIRFB)
 
 $(SRC_DIR)/hello_psalm_mem.sv: $(RES_DIR)/psalm.hex
 
-$(RES_DIR)/psalm.hex: $(RES_DIR)/psalm.txt $(TOOLS_DIR)/hexgen/target/debug/hexgen
-	cd $(TOOLS_DIR)/hexgen; cargo run $(RES_DIR)/psalm.txt
-
-$(TOOLS_DIR)/genhex/target/debug/hexgen: $(TOOLS_DIR)/genhex/target/src/main.rs
-	cd $(TOOLS_DIR)/hexgen; cargo build
+$(RES_DIR)/psalm.hex: $(RES_DIR)/psalm.txt $(TOOLS_DIR)/hexgen/Cargo.toml
+	cd $(TOOLS_DIR)/hexgen; cargo run --release -- $(RES_DIR)/psalm.txt
 
 # sby stuff
 $(PROJECT).sby: \
@@ -134,4 +131,5 @@ $(BUILD_DIR)/%.bit: $(BUILD_DIR)/%.config
 
 clean:
 	$(RM) -r *.config *.bit .*.d *.svf $(BUILD_DIR)/* $(GEN_DIR)/* obj_dir *.ln *.sby *.ys *.vcd*
+	$(RM) -r $(TOOLS_DIR)/hexgen/targets $(RES_DIR)/*.hex
 -include .*.d
